@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mini GencaTTS</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#0b0c10; color:#eee; text-align:center; padding:20px; }
+    textarea { width:90%; max-width:800px; min-height:80px; font-size:18px; padding:12px;
+      border-radius:10px; border:1px solid #333; background:#111; color:#fff; margin-bottom:20px; }
+    button { font-size:20px; padding:25px 30px; margin:8px; border:none; border-radius:12px;
+      cursor:pointer; color:#fff; min-width:160px; }
+    .gpt { background:#1a66ff; }
+    .speak { background:#1ebc62; }
+    .clear { background:#e63b3f; }
+    .neutral { background:#555; }
+    audio { margin-top:20px; width:100%; max-width:600px; }
+    details { margin-top:20px; text-align:left; max-width:800px; margin-left:auto; margin-right:auto;
+      background:#111; padding:15px; border-radius:10px; }
+    input, textarea { width:100%; margin-bottom:10px; padding:8px; border-radius:8px;
+      border:1px solid #333; background:#222; color:#eee; }
+  </style>
+</head>
+<body>
+  <h1>GencaTTS</h1>
+  <textarea id="textInput" placeholder="Scrivi qui..."></textarea><br>
+
+<button class="gpt" onclick="correggiTesto()">GPT</button>
+<button class="speak" onclick="convertiVoce()">PARLA</button>
+<button class="speak" onclick="ripetiAudio()">RIPETI</button>
+<button class="clear" onclick="cancellaTesto()">CANCELLA</button>
+<button class="neutral" onclick="toggleSettings()">IMPOSTAZIONI</button>
+<button class="neutral" onclick="toggleFullScreen()">SCHERMO INTERO</button>
+
+
+
+  <p id="status"></p>
+  <audio id="audioPlayer" controls></audio>
+
+  <details id="settings">
+    <summary><strong>⚙️ Impostazioni API</strong></summary>
+    <h3>OpenAI</h3>
+    <label>API Key</label>
+    <input type="password" id="gptApiKey">
+    <label>Modello GPT</label>
+    <input type="text" id="gptModel" value="gpt-4o-mini">
+    <label>Prompt</label>
+    <textarea id="gptPrompt">Correggi errori di battitura, punteggiatura e grammatica. Mantieni il significato.</textarea>
+
+    <h3>ElevenLabs</h3>
+    <label>API Key</label>
+    <input type="password" id="apiKey">
+    <label>Voice ID</label>
+    <input type="text" id="voiceId">
+    <label>Modello TTS</label>
+    <input type="text" id="modelTTS" value="eleven_flash_v2_5">
+
+    <button onclick="salvaSettings()">Salva</button>
+  </details>
+
+  <script>
+    const SETTINGS_KEY = "ttsSettings";
+
+    const $ = sel => document.querySelector(sel);
+
+    function getSettings() {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    }
+
+    function salvaSettings() {
+      const s = {
+        gptApiKey: $('#gptApiKey').value.trim(),
+        gptModel: $('#gptModel').value.trim(),
+        gptPrompt: $('#gptPrompt').value,
+        apiKey: $('#apiKey').value.trim(),
+        voiceId: $('#voiceId').value.trim(),
+        modelTTS: $('#modelTTS').value.trim()
+      };
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+      alert("Impostazioni salvate!");
+    }
+
+    function bindSettings() {
+      const s = getSettings();
+      $('#gptApiKey').value = s.gptApiKey || "";
+      $('#gptModel').value = s.gptModel || "gpt-4o-mini";
+      $('#gptPrompt').value = s.gptPrompt || "Correggi errori di battitura, punteggiatura e grammatica. Mantieni il significato.";
+      $('#apiKey').value = s.apiKey || "";
+      $('#voiceId').value = s.voiceId || "";
+      $('#modelTTS').value = s.modelTTS || "eleven_multilingual_v2";
+    }
+
+    function toggleSettings() {
+      $('#settings').open = !$('#settings').open;
+      if ($('#settings').open) bindSettings();
+    }
+
+    function cancellaTesto() {
+      $('#textInput').value = "";
+      $('#textInput').focus();
+      $('#status').textContent = "";
+    }
+
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    async function correggiTesto() {
+      const text = $('#textInput').value.trim();
+      const s = getSettings();
+      if (!text || !s.gptApiKey) { alert("Scrivi testo e configura GPT!"); return; }
+      $('#status').textContent = "Correzione in corso...";
+      try {
+        const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${s.gptApiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: s.gptModel,
+            messages: [
+              { role: "system", content: s.gptPrompt },
+              { role: "user", content: text }
+            ]
+          })
+        });
+        const data = await resp.json();
+        $('#textInput').value = data.choices[0].message.content.trim();
+        $('#status').textContent = "Testo corretto!";
+      } catch (e) {
+        $('#status').textContent = "Errore GPT: " + e.message;
+      }
+    }
+
+    async function convertiVoce() {
+      const text = $('#textInput').value.trim();
+      const s = getSettings();
+      if (!text || !s.apiKey || !s.voiceId) { alert("Scrivi testo e configura ElevenLabs!"); return; }
+      $('#status').textContent = "Generazione audio...";
+      try {
+        const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${s.voiceId}`, {
+          method: "POST",
+          headers: {
+            "xi-api-key": s.apiKey,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ text: text, model_id: s.modelTTS })
+        });
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const player = $('#audioPlayer');
+        player.src = url;
+        await player.play();
+        $('#status').textContent = "Audio pronto!";
+        player.onended = () => { cancellaTesto(); };
+      } catch (e) {
+        $('#status').textContent = "Errore TTS: " + e.message;
+      }
+    }
+
+    function ripetiAudio() {
+  const player = $('#audioPlayer');
+  if (!player.src) { 
+    alert("Nessun audio da ripetere!"); 
+    return; 
+  }
+  player.currentTime = 0;
+  player.play();
+}
+
+
+    document.addEventListener("DOMContentLoaded", () => {
+      $('#textInput').focus();
+      bindSettings();
+    });
+  </script>
+</body>
+</html>
