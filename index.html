@@ -8,7 +8,7 @@
     body { font-family: Arial, sans-serif; background:#0b0c10; color:#eee; text-align:center; padding:20px; }
     textarea { width:90%; max-width:800px; min-height:80px; font-size:18px; padding:12px;
       border-radius:10px; border:1px solid #333; background:#111; color:#fff; margin-bottom:20px; }
-    button { font-size:20px; padding:25px 30px; margin:8px; border:none; border-radius:12px;
+    button { font-size:20px; padding:30px 40px; margin:8px; border:none; border-radius:12px;
       cursor:pointer; color:#fff; min-width:160px; }
     .gpt { background:#1a66ff; }
     .speak { background:#1ebc62; }
@@ -17,28 +17,29 @@
     audio { margin-top:20px; width:100%; max-width:600px; }
     details { margin-top:20px; text-align:left; max-width:800px; margin-left:auto; margin-right:auto;
       background:#111; padding:15px; border-radius:10px; }
-    input, textarea { width:100%; margin-bottom:10px; padding:8px; border-radius:8px;
+    input, textarea, select { width:100%; margin-bottom:10px; padding:8px; border-radius:8px;
       border:1px solid #333; background:#222; color:#eee; }
+    label { display:block; margin-top:10px; }
   </style>
 </head>
 <body>
   <h1>GencaTTS</h1>
   <textarea id="textInput" placeholder="Scrivi qui..."></textarea><br>
 
-<button class="gpt" onclick="correggiTesto()">GPT</button>
-<button class="speak" onclick="convertiVoce()">PARLA</button>
-<button class="speak" onclick="ripetiAudio()">RIPETI</button>
-<button class="clear" onclick="cancellaTesto()">CANCELLA</button>
-<button class="neutral" onclick="toggleSettings()">IMPOSTAZIONI</button>
-<button class="neutral" onclick="toggleFullScreen()">SCHERMO INTERO</button>
-
-
+  <button class="gpt" onclick="correggiTesto()">GPT</button>
+  <button class="speak" onclick="convertiVoce()">PARLA</button>
+   <button class="speak" onclick="ripetiAudio()">RIPETI</button>
+  <button class="clear" onclick="cancellaTesto()">CANCELLA</button>
+  <button class="neutral" onclick="toggleSettings()">IMPOSTAZIONI</button>
+  <button class="neutral" onclick="toggleFullScreen()">SCHERMO INTERO</button>
+ 
 
   <p id="status"></p>
   <audio id="audioPlayer" controls></audio>
 
   <details id="settings">
     <summary><strong>⚙️ Impostazioni API</strong></summary>
+
     <h3>OpenAI</h3>
     <label>API Key</label>
     <input type="password" id="gptApiKey">
@@ -52,15 +53,44 @@
     <input type="password" id="apiKey">
     <label>Voice ID</label>
     <input type="text" id="voiceId">
+
     <label>Modello TTS</label>
-    <input type="text" id="modelTTS" value="eleven_flash_v2_5">
+    <select id="modelTTS">
+      <option value="eleven_flash_v2_5">eleven_flash_v2.5</option>
+      <option value="eleven_multilingual_v2">eleven_multilingual_v2</option>
+    </select>
+
+    <h3>Controlli voce</h3>
+    <label>Velocità parlato</label>
+    <input type="range" id="speakingRate" min="0.5" max="2" step="0.1" value="1" oninput="this.nextElementSibling.textContent = this.value">
+    <span>1</span>
+
+    <label>Stability</label>
+    <input type="range" id="stability" min="0" max="1" step="0.05" value="0.5" oninput="this.nextElementSibling.textContent = this.value">
+    <span>0.5</span>
+
+    <label>Similarity Boost</label>
+    <input type="range" id="similarity" min="0" max="1" step="0.05" value="0.75" oninput="this.nextElementSibling.textContent = this.value">
+    <span>0.75</span>
+
+    <label>Style Exaggeration</label>
+    <input type="range" id="styleEx" min="0" max="1" step="0.05" value="0" oninput="this.nextElementSibling.textContent = this.value">
+    <span>0</span>
+
+    <h3>Preset rapidi</h3>
+    <select id="preset" onchange="applicaPreset(this.value)">
+      <option value="">-- Seleziona preset --</option>
+      <option value="neutro">Neutro</option>
+      <option value="espressivo">Espressivo</option>
+      <option value="lento">Lento</option>
+      <option value="veloce">Veloce</option>
+    </select>
 
     <button onclick="salvaSettings()">Salva</button>
   </details>
 
   <script>
     const SETTINGS_KEY = "ttsSettings";
-
     const $ = sel => document.querySelector(sel);
 
     function getSettings() {
@@ -75,7 +105,12 @@
         gptPrompt: $('#gptPrompt').value,
         apiKey: $('#apiKey').value.trim(),
         voiceId: $('#voiceId').value.trim(),
-        modelTTS: $('#modelTTS').value.trim()
+        modelTTS: $('#modelTTS').value,
+        speakingRate: parseFloat($('#speakingRate').value) || 1,
+        stability: parseFloat($('#stability').value) || 0.5,
+        similarity: parseFloat($('#similarity').value) || 0.75,
+        styleEx: parseFloat($('#styleEx').value) || 0,
+        preset: $('#preset').value
       };
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
       alert("Impostazioni salvate!");
@@ -88,7 +123,21 @@
       $('#gptPrompt').value = s.gptPrompt || "Correggi errori di battitura, punteggiatura e grammatica. Mantieni il significato.";
       $('#apiKey').value = s.apiKey || "";
       $('#voiceId').value = s.voiceId || "";
-      $('#modelTTS').value = s.modelTTS || "eleven_multilingual_v2";
+      $('#modelTTS').value = s.modelTTS || "eleven_flash_v2_5";
+      $('#speakingRate').value = s.speakingRate ?? 1;
+      $('#stability').value = s.stability ?? 0.5;
+      $('#similarity').value = s.similarity ?? 0.75;
+      $('#styleEx').value = s.styleEx ?? 0;
+      $('#preset').value = s.preset || "";
+
+      // aggiorna gli span
+      $('#speakingRate').nextElementSibling.textContent = $('#speakingRate').value;
+      $('#stability').nextElementSibling.textContent = $('#stability').value;
+      $('#similarity').nextElementSibling.textContent = $('#similarity').value;
+      $('#styleEx').nextElementSibling.textContent = $('#styleEx').value;
+
+      // se c'è un preset, applicalo
+      if (s.preset) applicaPreset(s.preset, false);
     }
 
     function toggleSettings() {
@@ -150,7 +199,16 @@
             "xi-api-key": s.apiKey,
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({ text: text, model_id: s.modelTTS })
+          body: JSON.stringify({
+            text: text,
+            model_id: s.modelTTS,
+            voice_settings: {
+              stability: s.stability,
+              similarity_boost: s.similarity,
+              style_exaggeration: s.styleEx,
+              speaking_rate: s.speakingRate
+            }
+          })
         });
         const blob = await resp.blob();
         const url = URL.createObjectURL(blob);
@@ -165,15 +223,61 @@
     }
 
     function ripetiAudio() {
-  const player = $('#audioPlayer');
-  if (!player.src) { 
-    alert("Nessun audio da ripetere!"); 
-    return; 
-  }
-  player.currentTime = 0;
-  player.play();
-}
+      const player = $('#audioPlayer');
+      if (!player.src) {
+        alert("Nessun audio da ripetere!");
+        return;
+      }
+      player.currentTime = 0;
+      player.play();
+    }
 
+    function applicaPreset(tipo, save = true) {
+      switch (tipo) {
+        case "neutro":
+          $('#speakingRate').value = 1;
+          $('#stability').value = 0.5;
+          $('#similarity').value = 0.75;
+          $('#styleEx').value = 0;
+          break;
+        case "espressivo":
+          $('#speakingRate').value = 1;
+          $('#stability').value = 0.3;
+          $('#similarity').value = 0.6;
+          $('#styleEx').value = 0.7;
+          break;
+        case "lento":
+          $('#speakingRate').value = 0.8;
+          $('#stability').value = 0.6;
+          $('#similarity').value = 0.8;
+          $('#styleEx').value = 0.2;
+          break;
+        case "veloce":
+          $('#speakingRate').value = 1.4;
+          $('#stability').value = 0.4;
+          $('#similarity').value = 0.7;
+          $('#styleEx').value = 0.3;
+          break;
+        default:
+          return;
+      }
+
+      // aggiorna gli span
+      $('#speakingRate').nextElementSibling.textContent = $('#speakingRate').value;
+      $('#stability').nextElementSibling.textContent = $('#stability').value;
+      $('#similarity').nextElementSibling.textContent = $('#similarity').value;
+      $('#styleEx').nextElementSibling.textContent = $('#styleEx').value;
+
+      if (save) {
+        const s = getSettings();
+        s.preset = tipo;
+        s.speakingRate = parseFloat($('#speakingRate').value);
+        s.stability = parseFloat($('#stability').value);
+        s.similarity = parseFloat($('#similarity').value);
+        s.styleEx = parseFloat($('#styleEx').value);
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+      }
+    }
 
     document.addEventListener("DOMContentLoaded", () => {
       $('#textInput').focus();
